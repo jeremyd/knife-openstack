@@ -51,6 +51,12 @@ class Chef
       :description => "The image ID for the server",
       :proc => Proc.new { |i| Chef::Config[:knife][:image] = i }
 
+      option :delta_image,
+      :long => "--delta-image",
+      :description => "Creates base delta image on successful chef run for infrastructure changes",
+      :boolean => true,
+      :default => false
+
       option :security_groups,
       :short => "-G X,Y,Z",
       :long => "--groups X,Y,Z",
@@ -393,12 +399,29 @@ class Chef
         msg_pair("Image", server.image['id'])
         msg_pair("SSH Keypair", server.key_name) if server.key_name
         msg_pair("SSH Password", server.password) if (server.password && !server.key_name)
+        vm_ip = ''
         server.addresses.each do |name,addr|
           msg_pair("Network", name)
+          vm_ip << addr[0]['addr']
           msg_pair("  IP Address", addr[0]['addr'])
         end
         msg_pair("Environment", config[:environment] || '_default')
         msg_pair("Run List", config[:run_list].join(', '))
+
+        if config[:delta_image]
+          msg_pair("Preparing deplta image...", "")
+          msg_pair(" config[:ssh_user] - ",  config[:ssh_user])
+          msg_pair(" primary_public_ip_address(server.addresses) - ", primary_public_ip_address(server.addresses))
+          msg_pair(" config[:identity_file] - ", config[:identity_file])
+          Net::SSH.start(vm_ip, config[:ssh_user], {:keys => config[:identity_file], :keys_only => true}) do |ssh|
+            output = ssh.exec!("hostname; sudo rm -rf /etc/chef; sudo rm -rf /var/chef")
+            msg_pair("Done", output)
+          end
+          msg_pair("Creating deplta Image", server.name+"-"+config[:environment])
+          delta_img = server.create_image server.name+"-"+config[:environment]
+          msg_pair("Deplta Image ID", delta_img)
+        end
+
       end
 
       def bootstrap_for_windows_node(server, bootstrap_ip_address)
