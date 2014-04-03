@@ -172,6 +172,11 @@ class Chef
       :default => 600,
       :proc => Proc.new { |v| Chef::Config[:knife][:server_create_timeouts] = v }
 
+      option :nics,
+      :long => "--nics NICS",
+      :description => "JSON array specifying NICS attrs, e.g. one nic would be: [{'net_id': 'xxx', 'v4_fixed_id': 'x.x.x.x', 'port_id': 'xxx'}]",
+      :default => nil
+
       option :first_boot_attributes,
       :short => "-j JSON_ATTRIBS",
       :long => "--json-attributes JSON_ATTRIBS",
@@ -300,6 +305,11 @@ class Chef
         Chef::Log.debug("Creating server #{server_def}")
 
         begin
+          unless locate_config_value(:nics).nil?
+            nics_json = locate_config_value(:nics)
+            server_def.merge!({ :nics => JSON.parse(nics_json) })
+          end
+
           server = connection.servers.create(server_def)
         rescue Excon::Errors::BadRequest => e
           response = Chef::JSONCompat.from_json(e.response.body)
