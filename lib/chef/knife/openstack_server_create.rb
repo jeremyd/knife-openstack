@@ -20,6 +20,7 @@
 
 require 'chef/knife/openstack_base'
 require 'chef/knife/winrm_base'
+require 'chef/knife/dynect'
 
 class Chef
   class Knife
@@ -389,6 +390,17 @@ class Chef
           exit 1
         end
 
+        new_record_name = "#{server.name}.#{use_tld}"
+        msg_pair("Adding Dynect DNS", "#{new_record_name} #{bootstrap_ip_address}")
+        Dynect::Client.set_dns(
+          locate_config_value(:dynect_customer_name),
+          locate_config_value(:dynect_user_name),
+          locate_config_value(:dynect_password),
+          use_tld,
+          new_record_name,
+          bootstrap_ip_address
+        )
+
         if locate_config_value(:bootstrap_protocol) == 'winrm'
           print "\n#{ui.color("Waiting for winrm", :magenta)}"
           print(".") until tcp_test_winrm(bootstrap_ip_address, locate_config_value(:winrm_port))
@@ -415,6 +427,7 @@ class Chef
           vm_ip << addr[0]['addr']
           msg_pair("  IP Address", addr[0]['addr'])
         end
+        
         msg_pair("Environment", config[:environment] || '_default')
         msg_pair("Run List", config[:run_list].join(', '))
 
@@ -432,6 +445,10 @@ class Chef
           msg_pair("Deplta Image ID", delta_img)
         end
 
+      end
+
+      def use_tld
+        "flexilis.org"
       end
 
       def bootstrap_for_windows_node(server, bootstrap_ip_address)
