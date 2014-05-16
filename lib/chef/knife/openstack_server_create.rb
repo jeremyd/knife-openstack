@@ -121,6 +121,11 @@ class Chef
       :short => "-i IDENTITY_FILE",
       :long => "--identity-file IDENTITY_FILE",
       :description => "The SSH identity file used for authentication"
+      
+      option :with_volume,
+      :short => "-w VOLUME_NAME",
+      :long => "--with-volume VOLUME_NAME",
+      :description => "Attach a Ceph volume on create"
 
       option :prerelease,
       :long => "--prerelease",
@@ -412,6 +417,25 @@ class Chef
             sleep @initial_sleep_delay ||= 10
             puts("done")
           }
+          if config[:with_volume]
+# see if a volume with this name exists
+            my_volume = volume_connection.volumes.all.detect {|v| v.display_name == config[:with_volume]}
+            if my_volume
+              # if it does, (add fstab?), attach it, (add fstab?) and continue
+              server.attach_volume(my_volume.id, "/dev/vdb")
+              my_volume.wait_for { status == "in-use" }
+            else
+              # if it doesn't, create volume, attach, format, (mount?), (fstab?).  which parts does chef do? (fstab) (none?)
+              my_volume = volume_connection.volumes.create(size: 50, display_name: config[:with_volume], description: config[:with_volume])
+              server.attach_volume(my_volume.id, "/dev/vdb")
+              my_volume.wait_for { status == "in-use" }
+              msg_pair(" config[:identity_file] - ", config[:identity_file])
+              Net::SSH.start(bootstrap_ip_address, config[:ssh_user], {:keys => config[:identity_file], :keys_only => true, :paranoid => false}) do |ssh|
+              output = ssh.exec!("sudo mkfs.ext4 /dev/vdb")#; sudo e2label /dev/vdb #{config[:with_volume]}")
+              msg_pair("Done", output)
+            end
+          end
+        end
           bootstrap_for_node(server, bootstrap_ip_address).run
         end
         puts "\n"
@@ -436,7 +460,7 @@ class Chef
           msg_pair(" config[:ssh_user] - ",  config[:ssh_user])
           msg_pair(" primary_public_ip_address(server.addresses) - ", primary_public_ip_address(server.addresses))
           msg_pair(" config[:identity_file] - ", config[:identity_file])
-          Net::SSH.start(vm_ip, config[:ssh_user], {:keys => config[:identity_file], :keys_only => true}) do |ssh|
+          Net::SSH.start(vm_ip, config[:ssh_user], {:keys => config[:identity_file], :keys_only => true, :paranoid => false}) do |ssh|
             output = ssh.exec!("hostname; sudo rm -rf /etc/chef; sudo rm -rf /var/chef")
             msg_pair("Done", output)
           end
