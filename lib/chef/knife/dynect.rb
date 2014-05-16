@@ -27,16 +27,24 @@ class Dynect
         auth_token = result['data']['token']
       else
 # the messages returned from a failed command are a list
-        result['msgs'][0].each{|key, value| print key, " : ", value, "\n"}
+        #result['msgs'][0].each{|key, value| print key, " : ", value, "\n"}
       end
 
 # New headers to use from here on with the auth-token set
       headers = { "Content-Type" => 'application/json', 'Auth-Token' => auth_token }
 
-# Create the A record
+# Create or update the A record
       url = URI.parse("https://api2.dynect.net/REST/ARecord/#{tld}/#{record}/")
       record_data = { :rdata => { :address => new_address }, :ttl => "30" }
-      resp, data = http.post(url.path, record_data.to_json, headers)
+      # Get the record
+      resp, data = http.get(url.path, headers)
+      if resp.code == '404'
+        # create
+        resp, data = http.post(url.path, record_data.to_json, headers)
+      else
+        # update
+        resp, data = http.put(url.path, record_data.to_json, headers)
+      end
 
 # Publish the changes
       url = URI.parse("https://api2.dynect.net/REST/Zone/#{tld}/")
