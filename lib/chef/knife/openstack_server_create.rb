@@ -427,11 +427,12 @@ class Chef
             else
               # if it doesn't, create volume, attach, format, (mount?), (fstab?).  which parts does chef do? (fstab) (none?)
               my_volume = volume_connection.volumes.create(size: 50, display_name: config[:with_volume], description: config[:with_volume])
+              my_volume.wait_for { status == "available" }
               server.attach_volume(my_volume.id, "/dev/vdb")
               my_volume.wait_for { status == "in-use" }
               msg_pair(" config[:identity_file] - ", config[:identity_file])
               Net::SSH.start(bootstrap_ip_address, config[:ssh_user], {:keys => config[:identity_file], :keys_only => true, :paranoid => false}) do |ssh|
-              output = ssh.exec!("sudo mkfs.ext4 /dev/vdb")#; sudo e2label /dev/vdb #{config[:with_volume]}")
+              output = ssh.exec!("sudo mkfs.ext4 /dev/vdb && e2label /dev/vdb #{config[:with_volume]}")
               msg_pair("Done", output)
             end
           end
