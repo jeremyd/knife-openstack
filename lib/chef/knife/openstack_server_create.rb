@@ -432,7 +432,7 @@ class Chef
               my_volume.wait_for { status == "in-use" }
               msg_pair(" config[:identity_file] - ", config[:identity_file])
               Net::SSH.start(bootstrap_ip_address, config[:ssh_user], {:keys => config[:identity_file], :keys_only => true, :paranoid => false}) do |ssh|
-              output = ssh.exec!("sudo mkfs.ext4 /dev/vdb && e2label /dev/vdb #{config[:with_volume]}")
+              output = ssh.exec!("sudo mkfs.ext4 -L #{config[:with_volume]} /dev/vdb")
               msg_pair("Done", output)
             end
           end
